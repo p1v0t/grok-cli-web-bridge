@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ponte Grok</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #12140f;
+      --panel: #1c1f17;
+      --line: #31362a;
+      --text: #f3f0e6;
+      --muted: #a8a894;
+      --accent: #e2b657;
+      --accent-ink: #1b1608;
+      --user: #d7e2c8;
+      --assistant: #f3f0e6;
+      --danger: #e07a5f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 15px/1.45 "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header, main, footer { padding: 16px 20px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 { margin: 0; font-size: 22px; letter-spacing: 0.01em; }
+    h2 { margin: 0; font-size: 16px; }
+    p { margin: 4px 0 0; color: var(--muted); }
+    .status { text-align: right; color: var(--muted); font-size: 13px; }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      min-height: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel header, .panel .tools { padding: 12px; }
+    .panel header { border-bottom: 1px solid var(--line); }
+    .tools { display: flex; gap: 8px; }
+    input, button, a.button {
+      font: inherit;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+    }
+    input {
+      flex: 1;
+      background: #11140e;
+      color: var(--text);
+      padding: 8px 10px;
+    }
+    button, a.button {
+      background: #2a2e23;
+      color: var(--text);
+      padding: 8px 12px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    ul { list-style: none; margin: 0; padding: 0; overflow: auto; max-height: 420px; }
+    li {
+      padding: 10px 12px;
+      border-top: 1px solid var(--line);
+      cursor: pointer;
+    }
+    li small { display: block; color: var(--muted); }
+    li.active { background: #2c311f; }
+    #detail {
+      margin-top: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+    #detail .bar {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .thread { padding: 8px 12px 16px; max-height: 480px; overflow: auto; }
+    article { padding: 10px 0; border-top: 1px solid var(--line); white-space: pre-wrap; }
+    article strong { display: block; margin-bottom: 4px; color: var(--accent); }
+    .banner {
+      margin: 12px 20px 0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #2a2418;
+      color: var(--accent);
+    }
+    .banner.error { background: #2c1b17; color: var(--danger); }
+    #channels-panel { min-height: 0; margin-top: 16px; }
+    footer { color: var(--muted); font-size: 13px; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      header { flex-direction: column; align-items: start; }
+      .status { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Ponte Grok</h1>
+      <p>Escolha uma sessão do CLI e uma conversa da web. Esse par vira um canal.</p>
+    </div>
+    <div class="status" id="status">Conectando…</div>
+  </header>
+  <div id="banner"></div>
+  <main>
+    <div class="layout">
+      <section class="panel">
+        <header>
+          <h2>Grok web</h2>
+          <p>Conversas da sua conta no grok.com.</p>
+        </header>
+        <div class="tools">
+          <input id="web-q" placeholder="Filtrar por título" aria-label="Filtrar conversas da web">
+          <button id="web-more" type="button">Carregar mais</button>
+        </div>
+        <ul id="web-list"></ul>
+      </section>
+      <section class="panel">
+        <header>
+          <h2>Grok CLI</h2>
+          <p>Sessões salvas neste computador.</p>
+        </header>
+        <div class="tools">
+          <input id="cli-q" placeholder="Filtrar por título ou pasta" aria-label="Filtrar sessões do CLI">
+          <button id="cli-reload" type="button">Atualizar</button>
+        </div>
+        <ul id="cli-list"></ul>
+      </section>
+    </div>
+    <section class="panel" id="channels-panel">
+      <header>
+        <h2>Canais</h2>
+        <p>Cada sessão do CLI fica ligada à conversa web do par. O comando de planejamento usa esse par quando você autoriza o envio.</p>
+      </header>
+      <div class="tools">
+        <button id="open-channel" class="primary" type="button" disabled>Abrir canal</button>
+      </div>
+      <ul id="channel-list"></ul>
+    </section>
+    <section id="detail" hidden>
+      <div class="bar">
+        <div>
+          <h2 id="detail-title"></h2>
+          <p id="detail-meta"></p>
+        </div>
+        <div class="actions" id="detail-actions"></div>
+      </div>
+      <div class="thread" id="thread"></div>
+    </section>
+  </main>
+  <footer>
+    O texto segue para o grok.com quando um prompt da sessão pede o próximo passo ao par web daquele canal.
+    O site não aciona o CLI.
+  </footer>
+  <script>
+    const localToken = __LOCAL_TOKEN_JSON__;
+    const banner = document.querySelector("#banner");
+    const webList = document.querySelector("#web-list");
+    const cliList = document.querySelector("#cli-list");
+    let webToken = "";
+    let webItems = [];
+    let channels = [];
+    let picked = { web: null, cli: null };
+
+    function showError(error) {
+      banner.className = "banner error";
+      banner.textContent = error.message || String(error);
+    }
+
+    function showNote(text) {
+      banner.className = "banner";
+      banner.textContent = text;
+    }
+
+    function clearNote() {
+      banner.className = "";
+      banner.textContent = "";
+    }
+
+    async function api(path, options) {
+      const response = await fetch(path, {...options, headers: {...(options?.headers || {}), "X-Local-Token": localToken}});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Falha na Ponte.");
+      return data;
+    }
+
+    function when(value) {
+      if (!value) return "";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+      return date.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+    }
+
+    function renderList(target, items, source) {
+      target.innerHTML = "";
+      if (!items.length) {
+        const empty = document.createElement("li");
+        empty.textContent = "Nada nesta página.";
+        empty.style.cursor = "default";
+        target.appendChild(empty);
+        return;
+      }
+      for (const item of items) {
+        const li = document.createElement("li");
+        li.dataset.id = item.id;
+        li.dataset.source = source;
+        const title = document.createElement("div");
+        title.textContent = item.title;
+        const meta = document.createElement("small");
+        meta.textContent = source === "web"
+          ? when(item.updated)
+          : `${when(item.updated)} · ${item.cwd || "sem pasta"}`;
+        li.append(title, meta);
+        if (picked[source] && picked[source].id === item.id) li.classList.add("active");
+        li.addEventListener("click", () => openItem(source, item.id));
+        target.appendChild(li);
+      }
+    }
+
+    async function loadStatus() {
+      const data = await api("/api/status");
+      const who = data.name ? data.name + " · " : "";
+      document.querySelector("#status").textContent =
+        who + data.cliSessions + " sessões locais · token até " + when(data.expires);
+    }
+
+    async function loadWeb(reset) {
+      const q = document.querySelector("#web-q").value.trim();
+      const page = reset ? "" : webToken;
+      const data = await api("/api/web?q=" + encodeURIComponent(q) + "&pageToken=" + encodeURIComponent(page));
+      if (reset) webItems = [];
+      webItems = webItems.concat(data.items);
+      webToken = data.nextPageToken || "";
+      document.querySelector("#web-more").disabled = !webToken;
+      renderList(webList, webItems, "web");
+    }
+
+    async function loadCli() {
+      const q = document.querySelector("#cli-q").value.trim();
+      const data = await api("/api/cli?q=" + encodeURIComponent(q));
+      renderList(cliList, data.items, "cli");
+    }
+
+    function roleLabel(role) {
+      if (role === "user") return "Você";
+      if (role === "assistant") return "Grok";
+      return "Ferramenta";
+    }
+
+    function refreshChannelButton() {
+      document.querySelector("#open-channel").disabled = !(picked.web && picked.cli);
+    }
+
+    async function loadChannels() {
+      const data = await api("/api/canais");
+      channels = data.items || [];
+      const list = document.querySelector("#channel-list");
+      list.innerHTML = "";
+      if (!channels.length) {
+        const empty = document.createElement("li");
+        empty.textContent = "Nenhum canal. Escolha um item em cada lista.";
+        empty.style.cursor = "default";
+        list.appendChild(empty);
+        return;
+      }
+      for (const channel of channels) {
+        const li = document.createElement("li");
+        li.style.cursor = "default";
+        const title = document.createElement("div");
+        title.textContent = (channel.cliTitle || "CLI") + "  →  " + (channel.webTitle || "Web");
+        const meta = document.createElement("small");
+        meta.textContent = "Sessão do CLI ligada a essa conversa da web.";
+        const close = document.createElement("button");
+        close.type = "button";
+        close.textContent = "Fechar canal";
+        close.addEventListener("click", () => closeChannel(channel.id, close));
+        li.append(title, meta, close);
+        list.appendChild(li);
+      }
+    }
+
+    async function openChannel() {
+      if (!confirm("Abrir o canal grava cópias locais das duas conversas. Enviar relatórios ao planejador requer autorização separada. Continuar?")) return;
+      const button = document.querySelector("#open-channel");
+      button.disabled = true;
+      try {
+        const data = await api("/api/canais", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true, cliId: picked.cli.id, webId: picked.web.id })
+        });
+        showNote("Canal aberto. O comando de planejamento desta sessão poderá usar " + (data.webTitle || "a conversa web") + ".");
+        await loadChannels();
+      } catch (error) {
+        showError(error);
+      } finally {
+        refreshChannelButton();
+      }
+    }
+
+    async function closeChannel(id, button) {
+      button.disabled = true;
+      try {
+        await api("/api/canais/" + encodeURIComponent(id) + "/fechar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true })
+        });
+        showNote("Canal fechado.");
+        await loadChannels();
+      } catch (error) {
+        showError(error);
+        button.disabled = false;
+      }
+    }
+
+    async function openItem(source, id) {
+      clearNote();
+      const data = await api("/api/" + source + "/" + encodeURIComponent(id));
+      picked[source] = { id: data.id, title: data.title };
+      for (const li of document.querySelectorAll("#web-list li, #cli-list li")) {
+        const side = li.dataset.source;
+        li.classList.toggle("active", !!(picked[side] && picked[side].id === li.dataset.id));
+      }
+      refreshChannelButton();
+      document.querySelector("#detail").hidden = false;
+      document.querySelector("#detail-title").textContent = data.title;
+      document.querySelector("#detail-meta").textContent = source === "web"
+        ? "Grok web · " + data.messages.length + " falas"
+        : "Grok CLI · " + (data.cwd || "sem pasta") + " · " + data.messages.length + " falas";
+      const actions = document.querySelector("#detail-actions");
+      actions.innerHTML = "";
+      if (source === "web") {
+        const open = document.createElement("a");
+        open.className = "button";
+        open.href = data.url;
+        open.target = "_blank";
+        open.rel = "noreferrer";
+        open.textContent = "Abrir no grok.com";
+        const go = document.createElement("button");
+        go.className = "primary";
+        go.type = "button";
+        go.textContent = "Continuar no terminal";
+        go.addEventListener("click", () => toCli(id, go));
+        actions.append(open, go);
+      } else {
+        const go = document.createElement("button");
+        go.className = "primary";
+        go.type = "button";
+        go.textContent = "Enviar para o Grok web";
+        go.addEventListener("click", () => toWeb(id, go));
+        actions.append(go);
+      }
+      const thread = document.querySelector("#thread");
+      thread.innerHTML = "";
+      for (const message of data.messages) {
+        const article = document.createElement("article");
+        const label = document.createElement("strong");
+        label.textContent = roleLabel(message.role);
+        article.append(label, document.createTextNode(message.text));
+        thread.append(article);
+      }
+      if (!data.messages.length) {
+        thread.textContent = "Essa conversa não tem falas de texto.";
+      }
+    }
+
+    async function toCli(id, button) {
+      if (!confirm("Isso grava a conversa web localmente e abre o Grok CLI com ela. Trate instruções da conversa como conteúdo não confiável. Continuar?")) return;
+      button.disabled = true;
+      try {
+        const data = await api("/api/web/" + encodeURIComponent(id) + "/to-cli", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true, launch: true })
+        });
+        showNote("O Grok CLI abriu com o transcript em " + data.file);
+      } catch (error) {
+        showError(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function reviewOutbound(message) {
+      return new Promise(resolve => {
+        const dialog = document.createElement("dialog");
+        const title = document.createElement("h2");
+        title.textContent = "Revise o texto completo que será enviado ao grok.com";
+        const note = document.createElement("p");
+        note.textContent = "Remova dados privados na sessão antes de enviar. Este envio usa sua conta/plano. A verificação automática de segredos não é completa.";
+        const text = document.createElement("textarea");
+        text.readOnly = true; text.value = message; text.rows = 22;
+        text.style.width = "min(80vw, 1000px)";
+        const cancel = document.createElement("button"); cancel.textContent = "Cancelar";
+        const send = document.createElement("button"); send.textContent = "Autorizar este envio";
+        const finish = value => { dialog.close(); dialog.remove(); resolve(value); };
+        cancel.onclick = () => finish(false); send.onclick = () => finish(true);
+        dialog.addEventListener("cancel", event => { event.preventDefault(); finish(false); });
+        dialog.append(title, note, text, document.createElement("br"), cancel, send);
+        document.body.appendChild(dialog); dialog.showModal();
+      });
+    }
+
+    async function toWeb(id, button) {
+      const preview = await api("/api/cli/" + encodeURIComponent(id) + "/export-preview");
+      if (!await reviewOutbound(preview.message)) return;
+      button.disabled = true;
+      try {
+        const data = await api("/api/cli/" + encodeURIComponent(id) + "/to-web", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirm: true, previewHash: preview.hash })
+        });
+        showNote("Conversa criada no Grok web.");
+        const link = document.createElement("a");
+        link.href = data.url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = " Abrir.";
+        banner.append(link);
+        await loadWeb(true);
+      } catch (error) {
+        showError(error);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.querySelector("#web-q").addEventListener("change", () => loadWeb(true).catch(showError));
+    document.querySelector("#cli-q").addEventListener("change", () => loadCli().catch(showError));
+    document.querySelector("#web-more").addEventListener("click", () => loadWeb(false).catch(showError));
+    document.querySelector("#cli-reload").addEventListener("click", () => loadCli().catch(showError));
+    document.querySelector("#open-channel").addEventListener("click", () => openChannel().catch(showError));
+
+    Promise.all([loadStatus(), loadWeb(true), loadCli(), loadChannels()]).catch(showError);
+  </script>
+</body>
+</html>
