@@ -25,10 +25,11 @@ A local web interface for people who use both **grok.com** and **Grok CLI**. Bro
 
 ```mermaid
 flowchart LR
-    W["grok.com conversation"] -->|"Read / import"| B["Local bridge UI · 127.0.0.1"]
-    B -->|"Confirm / open terminal"| C["Grok CLI session"]
-    C -->|"Selected messages"| B
-    B -->|"Preview / confirm send"| W
+    W["grok.com"] -->|"Import"| B["Local bridge"]
+    
+    B -->|"Confirm"| C["Grok CLI"]
+    C -->|"Select"| B
+    B -->|"Review and send"| W
 ```
 
 The web server does not expose a remote terminal. Opening a planning channel does not start an automatic execution loop.
