@@ -1,5 +1,108 @@
 # Grok CLI ↔ Web Bridge
 
+**Continue Grok conversations between the browser and your terminal, with a review step before sending messages to the web.**
+
+[English](#english) · [Português](#português) · [Report a bug](https://github.com/p1v0t/grok-cli-web-bridge/issues) · [Security](SECURITY.md)
+
+Python 3.10+ · Standard library only · Local web interface · Windows-focused terminal integration
+
+## English
+
+A local web interface for people who use both **grok.com** and **Grok CLI**. Browse web conversations and local CLI sessions, import a web conversation into the terminal, and preview selected CLI messages before sending them back to grok.com.
+
+> **Status:** independent, unofficial integration using internal grok.com endpoints and Grok CLI authentication/session formats. These can change. The published edition is validated with simulated responses; it has not been validated by sending real conversations to the service.
+
+### What you can do
+
+| Task | How the bridge helps |
+| --- | --- |
+| Continue a web conversation in the CLI | Save its transcript locally and confirm before opening Grok CLI. |
+| Bring selected CLI messages to the web | Review the exact outgoing text and explicitly confirm the transfer. |
+| Keep planning context for a conversation | Link a CLI session and a web conversation in an isolated planning channel. |
+| Ask for a next-step plan | Explicitly send a report and the channel knowledge; receive text to review in the CLI. |
+
+### How it fits together
+
+```mermaid
+flowchart LR
+    W["grok.com conversation"] -->|"Read / import"| B["Local bridge UI · 127.0.0.1"]
+    B -->|"Confirm / open terminal"| C["Grok CLI session"]
+    C -->|"Selected messages"| B
+    B -->|"Preview / confirm send"| W
+```
+
+The web server does not expose a remote terminal. Opening a planning channel does not start an automatic execution loop.
+
+### Quick start
+
+**Requirements:** Python 3.10 or newer, Git to clone the repository, and Grok CLI installed and authenticated through its provider. The bridge itself uses only the Python standard library.
+
+```sh
+git clone https://github.com/p1v0t/grok-cli-web-bridge.git
+cd grok-cli-web-bridge
+```
+
+On **Windows**:
+
+```powershell
+py -3 ponte.py
+```
+
+Or open `Abrir Ponte.bat`. On **Linux/macOS**, run `python3 ponte.py`; interactive terminal launching is primarily adapted for Windows.
+
+The interface opens at **http://127.0.0.1:8765**. Use `--no-browser` to skip opening a tab. Press `Ctrl+C` in the server terminal to stop.
+
+### Example workflow
+
+1. Start the bridge and browse your web conversations and local CLI sessions.
+2. Choose a web conversation to continue in the terminal. Review its content and confirm the import.
+3. Work in Grok CLI. When you want to send selected messages back, open the bridge preview.
+4. Check the exact outgoing text and confirm. If the CLI session changes after previewing, review it again.
+
+The interface currently uses Portuguese labels. **Continuar no terminal** means continue in the terminal; **Enviar para o Grok web** means send to Grok web; **Abrir canal** means open a planning channel.
+
+### Configuration
+
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `GROK_HOME` | `~/.grok` | Grok CLI authentication and sessions |
+| `GROK_BRIDGE_HOME` | `~/.grok-bridge` | Private channels, imports and planning knowledge |
+| `GROK_BRIDGE_PORT` | `8765` | Local IPv4 loopback port |
+
+Keep these data directories private and outside the repository. The bridge reads the CLI authentication at runtime; credentials are not included in this repository or returned to the UI.
+
+### Privacy, limits and validation
+
+- The server binds to `127.0.0.1`, checks Host/Origin and uses a per-start API token.
+- Sending messages or planning reports transfers their contents to grok.com. Review text for secrets and personal data; automatic filtering cannot catch everything.
+- Imported conversations are untrusted content. Review instructions before executing them.
+- Local access controls do not protect against other software running as the same operating-system user.
+- Tests use simulated responses, without real authentication or Grok requests. See [SECURITY.md](SECURITY.md) for the security policy.
+
+Run the test suite on Windows:
+
+```powershell
+py -3 -m unittest discover -s tests -v
+```
+
+On Linux/macOS, replace `py -3` with `python3`. For planning commands and detailed safeguards, see the Portuguese reference below and [examples/PLANNER.md](examples/PLANNER.md).
+
+### Feedback and related project
+
+Found a problem? [Open an issue](https://github.com/p1v0t/grok-cli-web-bridge/issues) with your OS, Python version, reproduction steps and expected result. Remove tokens, private conversations and other sensitive data before posting. Follow [SECURITY.md](SECURITY.md) for security reports.
+
+For coordination across AI providers, see [Multi-AI Hub](https://github.com/p1v0t/multi-ai-hub). Starting this bridge does not start the hub or its executors.
+
+**License:** this publication does not include an additional software license. Public source availability alone does not grant an open-source license.
+
+---
+
+## Português
+
+**Continue suas conversas do Grok entre o navegador e o terminal, revisando o texto antes de enviá-lo à web.**
+
+[Voltar ao início](#grok-cli--web-bridge)
+
 Ponte local para consultar conversas do grok.com e sessões do Grok CLI, importar uma conversa web para o terminal e enviar falas selecionadas à web após revisão. Inclui canais de planejamento: a conversa web sugere um próximo passo e o CLI recebe o texto. O servidor web não fornece um terminal remoto.
 
 Edição pública independente; Python 3.10+ e biblioteca padrão. Não inclui contas, tokens, conversas, configurações privadas ou histórico de projetos.
